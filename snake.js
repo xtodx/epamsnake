@@ -1,6 +1,11 @@
 $(document).ready(function() {
   snakeWebSocket();
 });
+
+function reloadPage() {
+  location.reload();
+}
+
 String.prototype.indexOfArray = function(array) {
   var str = this;
   var ret = false;
@@ -162,7 +167,6 @@ var eatSymbols = {
   'fury': [
     '®',
     '●',
-    '$',
     '˅',
     '<',
     '>',
@@ -206,12 +210,16 @@ function onOpen(evt) {
 
 function onClose(evt) {
   socket.close();
-  //setTimeout(snakeWebSocket, 10000);
+  setTimeout(snakeWebSocket, 1000);
 }
 
 function onMessage(evt) {
   var data = evt.data.replace('board=', '');
-  parseData(data);
+  try {
+    parseData(data);
+  } catch (e) {
+    reloadPage();
+  }
 }
 
 function onError(evt) {
@@ -338,7 +346,7 @@ function Lee() {
       return false;
   };
 
-  this.checkSafePoint = function(point) {
+  this.checkSafePoint = function(point, step) {
     var safe = 0;
     for (var y = -1; y <= 1; ++y)
       for (var x = -1; x <= 1; ++x)
@@ -346,7 +354,12 @@ function Lee() {
         //проверка на выход за пределы поля
           if (this.checkLimit(point[1] + x, point[0] + y)) {
             if (this.checkPointObstacle(point[1] + x, point[0] + y))
-              safe++;
+              if (step < 2)
+                safe++;
+              else {
+                if (this.checkSafePoint([point[1] + x, point[0] + y], step - 1))
+                  safe++;
+              }
           }
     if (safe >= 2)
       return true;
@@ -408,7 +421,7 @@ function Lee() {
     for (var i = 0; i < count; ++i) {
       //если достигли конца, то тикаем
       if (this.checkEndPoint(p[i][1], p[i][0])) {
-        if (this.checkSafePoint(p[i])) {
+        if (this.checkSafePoint(p[i], 2)) {
           bEnd = true;
           coords[0] = p[i][0];
           coords[1] = p[i][1];
