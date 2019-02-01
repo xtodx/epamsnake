@@ -1,6 +1,11 @@
 $(document).ready(function() {
   snakeWebSocket();
 });
+
+function reloadPage() {
+  location.reload();
+}
+
 String.prototype.indexOfArray = function(array) {
   var str = this;
   var ret = false;
@@ -15,13 +20,20 @@ String.prototype.indexOfArray = function(array) {
 };
 
 var socket;
-var URL = 'https://game2.epam-bot-challenge.com.ua/codenjoy-contest/board/player/tonylovepony@gmail.com?code=528051571629643063';
+var URL = 'https://game2.epam-bot-challenge.com.ua/codenjoy-contest/board/player/webmasterbycom@gmail.com?code=16163262031219726121';
 var COMMANDS = ['LEFT', 'RIGHT', 'DOWN', 'UP', 'ACT'];
 var matrix = [];
 var wawes = [];
 var length = 0;
 var head = [0, 0]; // y, x
 var step;
+var costs = [];
+
+costs['○'.charCodeAt(0)] = 1;
+costs['$'.charCodeAt(0)] = 5;
+costs['®'.charCodeAt(0)] = 2;
+costs['©'.charCodeAt(0)] = 2;
+costs['●'.charCodeAt(0)] = 10;
 
 var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
 var fly = '♠';
@@ -162,7 +174,6 @@ var eatSymbols = {
   'fury': [
     '®',
     '●',
-    '$',
     '˅',
     '<',
     '>',
@@ -206,12 +217,16 @@ function onOpen(evt) {
 
 function onClose(evt) {
   socket.close();
-  //setTimeout(snakeWebSocket, 10000);
+  setTimeout(snakeWebSocket, 1000);
 }
 
 function onMessage(evt) {
   var data = evt.data.replace('board=', '');
+  //try {
   parseData(data);
+  //} catch (e) {
+  // reloadPage();
+  //}
 }
 
 function onError(evt) {
@@ -250,6 +265,7 @@ function parseData(data) {
       console.log('NO COMMAND :(');
       doSend('NONE');
     }
+    lee = null;
   } else {
     doSend('NONE');
   }
@@ -325,6 +341,7 @@ function randomInteger(min, max) {
 function Lee() {
   var bEnd = false;
   var coords = [head[0], head[1]];
+  var cost = step * 2;
   for (var ii = 0; ii < step; ii++) {
     wawes[ii] = [];
     for (var kk = 0; kk < step; kk++) {
@@ -338,7 +355,7 @@ function Lee() {
       return false;
   };
 
-  this.checkSafePoint = function(point) {
+  this.checkSafePoint = function(point, step) {
     var safe = 0;
     for (var y = -1; y <= 1; ++y)
       for (var x = -1; x <= 1; ++x)
@@ -346,7 +363,12 @@ function Lee() {
         //проверка на выход за пределы поля
           if (this.checkLimit(point[1] + x, point[0] + y)) {
             if (this.checkPointObstacle(point[1] + x, point[0] + y))
-              safe++;
+              if (step < 2)
+                safe++;
+              else {
+                if (this.checkSafePoint([point[1] + x, point[0] + y], step - 1))
+                  safe++;
+              }
           }
     if (safe >= 2)
       return true;
@@ -387,7 +409,7 @@ function Lee() {
               minimal = wawes[point[0] + y][point[1] + x];
             }
 
-    if (minimal == 1) {
+    if (minimal < 2) {
       console.log(mcrd);
       return mcrd;
     } else {
@@ -403,18 +425,18 @@ function Lee() {
     var count = p.length;
     var points = new Array();
     //если закончен расчёт, тикаем
-    if (count == 0 || bEnd) return true;
+    if (count == 0) return true;
     //обходим точки
     for (var i = 0; i < count; ++i) {
       //если достигли конца, то тикаем
       if (this.checkEndPoint(p[i][1], p[i][0])) {
-        if (this.checkSafePoint(p[i])) {
-          bEnd = true;
-          coords[0] = p[i][0];
-          coords[1] = p[i][1];
-          console.log('I WANT EAT - ' + matrix[p[i][0]][p[i][1]]);
-          console.log(wawes);
-          return true;
+        if (this.checkSafePoint(p[i], 2)) {
+          var itscost = costs[matrix[p[i][0]][p[i][1]].charCodeAt(0)];
+          if (cost > wawes[p[i][0]][p[i][1]] / itscost) {
+            coords[0] = p[i][0];
+            coords[1] = p[i][1];
+            cost = wawes[p[i][0]][p[i][1]] / itscost;
+          }
         }
       }
       //проверяем окружные 4 клеток
