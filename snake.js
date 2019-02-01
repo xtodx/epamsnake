@@ -25,7 +25,7 @@ var step;
 
 var headSymbols = ['◄', '►', '▲', '▼'];
 var headTo = '►';
-var okSymbols = [' ', '○', '$', '®', '©'];
+var okSymbols = [' ', '○', '$', '®', '©', '◄', '►', '▲', '▼'];
 var eatSymbols = ['○', '$'];
 
 function chatWebSocket() {
@@ -67,7 +67,6 @@ function parseData(data) {
   step = Math.sqrt(data.length);
   var hd = data.indexOfArray(headSymbols);
   if (hd) {
-    console.log("Head Find");
     head[0] = Math.floor(hd[0] / step);
     head[1] = hd[0] % step;
     headTo = hd[1];
@@ -75,14 +74,25 @@ function parseData(data) {
     for (var i = 0, charsLength = data.length; i < charsLength; i += step) {
       matrix.push(data.substring(i, i + step));
     }
-    var coord = findEat(data);
-    console.log("Eay Find");
-    var command = findPath(coord);
-    console.log("Path Find");
-    console.log(command);
-    doSend(command);
+    var lee = new Lee();
+    lee.checkPoints([[head[0], head[1]]]);
+    console.log('EAT ON ' + lee.getCoords());
+    var cell = lee.getCell();
+    doSend(getCommand(cell));
   }
   printData();
+}
+
+function getCommand(cell) {
+  if (cell[0] > head[0]) {
+    return COMMANDS[2];
+  } else if (cell[0] < head[0]) {
+    return COMMANDS[3];
+  } else if (cell[1] > head[1]) {
+    return COMMANDS[1];
+  } else if (cell[1] < head[1]) {
+    return COMMANDS[0];
+  }
 }
 
 function printData() {
@@ -91,41 +101,6 @@ function printData() {
   matrix.forEach(function(row) {
     $('.board').append(row + br);
   });
-}
-
-function findEat(data) {
-  var regV = /○/gi;
-  var result;
-  var min = step * 2;
-  var coords = [0, 0];
-  while (result = regV.exec(data)) {
-    var x = Math.floor(result.index / step);
-    var y = result.index % step;
-    var path = Math.abs(head[0] - y) + Math.abs(head[1] - x);
-    if (min > path) {
-      coords[0] = y;
-      coords[1] = x;
-      min = path;
-    }
-  }
-  return coords;
-}
-
-function findPath(coords) {
-  var STACK = [];
-  if (coords[0] > head[0]) {
-    STACK[STACK.length] = COMMANDS[2];
-  } else {
-    STACK[STACK.length] = COMMANDS[3];
-  }
-
-  if (coords[1] > head[1]) {
-    STACK[STACK.length] = COMMANDS[1];
-  } else {
-    STACK[STACK.length] = COMMANDS[0];
-  }
-
-  return STACK[randomInteger(0, STACK.length - 1)];
 }
 
 function randomInteger(min, max) {
@@ -141,4 +116,96 @@ function onError(evt) {
 function doSend(message) {
 
   socket.send(message);
+}
+
+function Lee() {
+  var bEnd = false;
+  var coords = [];
+  for (var ii = 0; ii < step; ii++) {
+    wawes[ii] = [];
+    for (var kk = 0; kk < step; kk++) {
+      wawes[ii][kk] = step * 2;
+    }
+  }
+  this.checkLimit = function(x, y) {
+    if (x >= 0 && x < step && y >= 0 && y < step)
+      return true;
+    else
+      return false;
+  };
+
+  this.checkPointObstacle = function(x, y) {
+    if (okSymbols.indexOf(matrix[y][x]))
+      return true;
+    else
+      return false;
+  };
+  this.checkEndPoint = function(x, y) {
+    if (eatSymbols.indexOf(matrix[y][x]))
+      return true;
+    else
+      return false;
+  };
+  this.getCoords = function() {
+    return coords;
+  };
+  this.getCell = function() {
+    return this.returnToStart(coords);
+  };
+  var itterations = 0;
+  this.returnToStart = function(point) {
+    console.log(itterations++);
+    console.log(point[0] + ' | ' + point[1]);
+    var mcrd = [0,0];
+    var minimal = wawes[point[0]][point[1]];
+    for (var y = -1; y <= 1; ++y)
+      for (var x = -1; x <= 1; ++x)
+        if (!(x == 0 && y == 0) && (x == 0 | y == 0))
+        //проверка на выход за пределы поля
+          if (this.checkLimit(point[1] + x, point[0] + y))
+            if (wawes[point[0] + y][point[1] + x] < minimal) {
+              mcrd = [point[0] + y, point[1] + x];
+            } else {
+              console.log(wawes[point[0] + y][point[1] + x] + '>' + minimal);
+            }
+    if (minimal == 1) {
+      return mcrd;
+    } else {
+      return this.returnToStart(mcrd);
+    }
+  };
+  this.checkPoints = function(p) {
+    var count = p.length;
+    var points = new Array();
+    //если закончен расчёт, тикаем
+    if (count == 0 || bEnd) return;
+    //обходим точки
+    for (var i = 0; i < count; ++i) {
+      //если достигли конца, то тикаем
+      if (this.checkEndPoint(p[i][1], p[i][0])) {
+        bEnd = true;
+        coords[0] = p[i][0];
+        coords[1] = p[i][1];
+        return;
+      }
+      //проверяем окружные 4 клеток
+      for (var y = -1; y <= 1; ++y)
+        for (var x = -1; x <= 1; ++x)
+          if (!(x == 0 && y == 0) && (x == 0 | y == 0))
+          //проверка на выход за пределы поля
+            if (this.checkLimit(p[i][1] + x, p[i][0] + y))
+            //проверка на препятствия
+              if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y)) {
+                //проверка на краткость пути
+                if (wawes[p[i][0] + y][p[i][1] + x] > wawes[p[i][0]][p[i][1]] +
+                    1) {
+                  wawes[p[i][0] + y][p[i][1] + x] = wawes[p[i][0]][p[i][1]] + 1;
+                  points[points.length] = [p[i][0] + y, p[i][1] + x];
+                }
+              }
+    }
+    //повторяем для новых клеток
+    this.checkPoints(points);
+  };
+
 }
