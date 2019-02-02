@@ -311,7 +311,8 @@ function getCommand(cell) {
   } else {
     com = 'NONE';
   }
-  if (status == 'big' || status == 'fury')
+  //status == 'big' || 
+  if (status == 'fury')
     com += ',' + COMMANDS[4];
   return com;
 }
@@ -437,7 +438,7 @@ function Lee() {
             //проверка на выход за пределы поля
             if (this.checkLimit(p[i][1] + x, p[i][0] + y)) {
               //проверка на препятствия
-              if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y)) {
+              if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y) && this.checkSafePoint([p[i][0] + y, p[i][1] + x], 1)) {
                 //проверка на краткость пути
                 if (wawes[p[i][0] + y][p[i][1] + x] > wawes[p[i][0]][p[i][1]] +
                     1) {
