@@ -13,16 +13,49 @@
     <script>
       URL = '<?=$_GET['URL']?>';
     </script>
+
+    <style>
+        .row {
+            display: flex;
+            width: 100%;
+        }
+
+        .cell {
+            text-align: center;
+            height: 20px;
+            flex: 1;
+        }
+
+        .cell.enemy {
+            background: #ffaaaa;
+        }
+
+        .cell:before {
+            content: '';
+            display: inline;
+            vertical-align: middle;
+            height: 100%;
+        }
+
+    </style>
 </head>
 <body>
-    <pre class="board">
-
-    </pre>
-
-    <form>
-        <input type="text" name="URL" value="<?= $_GET['URL'] ?>">
-        <br>
-        <button type="submit">Отправить</button>
-    </form>
+<?php
+    for ($i = 0; $i < 30; $i++) {
+        ?>
+        <div class="row">
+            <?php
+                for ($k = 0; $k < 30; $k++) {
+                    ?>
+                    <div class="cell" id="c-<?= $i ?>-<?= $k ?>"></div>
+                <?php } ?>
+        </div>
+    <?php } ?>
+<hr>
+<form>
+    <textarea name="URL" style="width: 100%;margin-bottom: 15px;"><?= $_GET['URL'] ?></textarea>
+    <br>
+    <button type="submit">Отправить</button>
+</form>
 </body>
 </html>

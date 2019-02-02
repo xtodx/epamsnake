@@ -1,6 +1,6 @@
 $(document).ready(function() {
   snakeWebSocket();
-  setInterval(reloadPage,600000)
+  setInterval(reloadPage, 3000000);
 });
 
 function reloadPage() {
@@ -20,21 +20,55 @@ String.prototype.indexOfArray = function(array) {
   return ret;
 };
 
+Array.prototype.indexArrayInArray = function(array) {
+  var ret = -1;
+  this.forEach(function(el, i) {
+    if (el.join(',') == array.join(',')) {
+      ret = i;
+      return i;
+    }
+  });
+  return ret;
+};
+String.prototype.replaceAt = function(index, replacement) {
+  return this.substr(0, index) + replacement +
+      this.substr(index + replacement.length);
+};
+String.prototype.getAllIndexes = function getAllIndexes(val) {
+  var indexes = [], i = -1;
+  while ((i = this.indexOf(val, i + 1)) != -1) {
+    indexes.push(i);
+  }
+  return indexes;
+};
+
 var socket;
 var COMMANDS = ['LEFT', 'RIGHT', 'DOWN', 'UP', 'ACT'];
 var matrix = [];
 var wawes = [];
 var length = 0;
 var head = [0, 0]; // y, x
+var napr = 'RIGHT';
 var step;
 var costs = [];
 var URL = '';
 
-costs['○'.charCodeAt(0)] = 2;
-costs['$'.charCodeAt(0)] = 5;
-costs['®'.charCodeAt(0)] = 20;
-costs['©'.charCodeAt(0)] = 5;
-costs['●'.charCodeAt(0)] = 10;
+costs['○'.charCodeAt(0)] = 20;
+costs['$'.charCodeAt(0)] = 50;
+costs['®'.charCodeAt(0)] = 200;
+costs['©'.charCodeAt(0)] = 10;
+costs['●'.charCodeAt(0)] = 100;
+costs['˅'.charCodeAt(0)] = 100;
+costs['<'.charCodeAt(0)] = 100;
+costs['>'.charCodeAt(0)] = 100;
+costs['˄'.charCodeAt(0)] = 100;
+costs['─'.charCodeAt(0)] = 50;
+costs['│'.charCodeAt(0)] = 50;
+costs['┐'.charCodeAt(0)] = 50;
+costs['┘'.charCodeAt(0)] = 50;
+costs['┌'.charCodeAt(0)] = 50;
+costs['└'.charCodeAt(0)] = 50;
+costs[' '.charCodeAt(0)] = 1; //Сделал завышенные коэфициенты, и добавил пробел в символы "еда", чтоб если нет адекватной еды, мы ехали в ближайший пустой блок, но не убивались об стену. Лучше пусть другие умирают.
 
 var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
 var fly = '♠';
@@ -43,6 +77,7 @@ var status = 'ok';
 var maskTime = 0;
 var maskFury = '®';
 var maskFly = '©';
+var enemies = [];
 var symbols = {
   'ok': [
     ' ',
@@ -171,11 +206,12 @@ var symbols = {
     '╕'],
 };
 var eatSymbols = {
-  'ok': ['○', '$', '®', '©'],
-  'fly': ['○', '$', '®', '©'],
-  'flybig': ['○', '●', '$', '®', '©'],
-  'big': ['○', '●', '$', '®', '©'],
+  'ok': [' ', '○', '$', '®', '©'],
+  'fly': [' ', '○', '$', '®', '©'],
+  'flybig': [' ', '○', '●', '$', '®', '©'],
+  'big': [' ', '○', '●', '$', '®', '©'],
   'fury': [
+    ' ',
     '®',
     '●',
     '˅',
@@ -193,6 +229,9 @@ var stone = '●';
 var prevObj = '○';
 var bigLength = 5;
 var snakeSymbols = ['╙', '╘', '╓', '╕', '═', '║', '╗', '╝', '╔', '╚'];
+var enemySymbols = ['¤', '×', 'æ', 'ö', '─', '│', '┐', '┘', '┌', '└'];
+var enemyHeads = ['˅', '<', '>', '˄', '♣', '♦'];
+var neck = '#';
 
 function snakeWebSocket() {
   var ws = URL.replace('http', 'ws').
@@ -226,11 +265,12 @@ function onClose(evt) {
 
 function onMessage(evt) {
   var data = evt.data.replace('board=', '');
-  //try {
-  parseData(data);
-  //} catch (e) {
-  // reloadPage();
-  //}
+  try {
+    parseData(data);
+  } catch (e) {
+    console.log(e);
+    console.log(matrix);
+  }
 }
 
 function onError(evt) {
@@ -248,27 +288,31 @@ function parseData(data) {
     maskTime--;
   matrix = [];
   for (var i = 0, charsLength = data.length; i < charsLength; i += step) {
-    matrix.push(data.substring(i, i + step));
+    matrix[matrix.length] = data.substring(i, i + step);
   }
   var hd = data.indexOfArray(headSymbols);
   length = findLength(data);
   console.log('LENGTH = ' + length);
   setStatus(data);
+  var efinder = new EnemiesFinder();
+  efinder.find(data);
+  efinder = null;
   if (hd) {
     head[0] = Math.floor(hd[0] / step);
     head[1] = hd[0] % step;
-    var lee = new Lee();
+    blockAfterHead(head);
+    var finder = new PathFinder();
     console.log('Finding...');
     wawes[head[0]][head[1]] = 0;
-    lee.checkPoints([[head[0], head[1]]]);
-    console.log('EAT ON ' + lee.getCoords());
-    var cell = lee.getCell();
+    finder.checkPoints([[head[0], head[1]]]);
+    console.log('EAT ON ' + finder.getCoords());
+    var cell = finder.getCell();
+    finder = null;
     if (matrix[cell[0]][cell[1]] == maskFury) {
       maskTime = 10;
     } else if (matrix[cell[0]][cell[1]] == maskFly) {
       maskTime = 10;
     }
-    console.log('Sending...');
     if (cell) {
       console.log('Command :)');
       doSend(getCommand(cell));
@@ -276,11 +320,10 @@ function parseData(data) {
       console.log('NO COMMAND :(');
       doSend('NONE');
     }
-    lee = null;
   } else {
     doSend('NONE');
   }
-  printData();
+  setTimeout(printData, 1);
 }
 
 function findLength(data) {
@@ -292,6 +335,18 @@ function findLength(data) {
 
   return lngth;
 
+}
+
+function blockAfterHead(point) {
+  if (napr == 'DOWN') {
+    matrix[point[0] - 1] = matrix[point[0] - 1].replaceAt(point[1], neck);
+  } else if (napr == 'UP') {
+    matrix[point[0] + 1] = matrix[point[0] + 1].replaceAt(point[1], neck);
+  } else if (napr == 'LEFT') {
+    matrix[point[0]] = matrix[point[0]].replaceAt(point[1] + 1, neck);
+  } else {
+    matrix[point[0]] = matrix[point[0]].replaceAt(point[1] - 1, neck);
+  }
 }
 
 function setStatus(data) {
@@ -313,10 +368,6 @@ function setStatus(data) {
 }
 
 function getCommand(cell) {
-  console.log('Next Cell');
-  console.log(cell);
-  console.log('Head Cell');
-  console.log(head);
   prevObj = matrix[cell[0]][cell[1]];
   var com = '';
   if (cell[0] > head[0]) {
@@ -330,16 +381,25 @@ function getCommand(cell) {
   } else {
     com = 'NONE';
   }
+  napr = com;
   if (status == 'fury')
     com += ',' + COMMANDS[4];
   return com;
 }
 
 function printData() {
-  $('.board').html('');
-  var br = '<br>';
-  matrix.forEach(function(row) {
-    $('.board').append(row + br);
+  $('.enemy').removeClass('enemy');
+  matrix.forEach(function(row, i) {
+    row = row.split('');
+    row.forEach(function(sym, k) {
+      $('#c-' + i + '-' + k).html(sym);
+    });
+  });
+
+  enemies.forEach(function(enemy) {
+    enemy.forEach(function(cr) {
+      $('#c-' + cr[0] + '-' + cr[1]).addClass('enemy');
+    });
   });
 }
 
@@ -349,30 +409,83 @@ function randomInteger(min, max) {
   return rand;
 }
 
-function Lee() {
-  var bEnd = false;
+function checkLimit(x, y) {
+  if (x >= 0 && x < step && y >= 0 && y < step)
+    return true;
+  else
+    return false;
+}
+
+function EnemiesFinder() {
+  var coords = [];
+  var that = this;
+  var allCoords = [];
+  this.find = function(data) {
+    enemies = [];
+    enemyHeads.forEach(function(el) {
+      var indexes = data.getAllIndexes(el);
+      indexes.forEach(function(el) {
+        coords = [];
+        var enemy = [];
+        enemy[0] = [];
+        enemy[0][0] = Math.floor(el / step);
+        enemy[0][1] = el % step;
+        var ends = that.findEnemy(enemy[0]);
+        enemy = enemy.concat(ends);
+        enemies[enemies.length] = enemy;
+      });
+    });
+    return enemies;
+  };
+
+  this.checkSymbols = function(x, y) {
+    if (enemySymbols.indexOf(matrix[y][x]) + 1)
+      return true;
+    else
+      return false;
+  };
+
+  this.findEnemy = function(point) {
+    for (var y = -1; y <= 1; ++y)
+      for (var x = -1; x <= 1; ++x)
+        if (!(x == 0 && y == 0) && (x == 0 || y == 0))
+          if (checkLimit(point[1] + x, point[0] + y)) {
+            if (this.checkSymbols(point[1] + x, point[0] + y)) {
+              if (allCoords.indexArrayInArray([point[0] + y, point[1] + x]) ==
+                  -1) {
+                allCoords[allCoords.length] = [point[0] + y, point[1] + x];
+                coords[coords.length] = [point[0] + y, point[1] + x];
+                this.findEnemy([point[0] + y, point[1] + x]);
+              }
+            }
+          }
+    return coords;
+  };
+}
+
+function pointDistance(p1, p2) {
+  return Math.abs(p1[0] - p2[0]) + Math.abs(p1[1] - p2[1]);
+}
+
+function PathFinder() {
   var coords = [head[0], head[1]];
   var cost = step * 2;
+  var maskCost = step * 2;
+  var maskCoords = false;
   for (var ii = 0; ii < step; ii++) {
     wawes[ii] = [];
     for (var kk = 0; kk < step; kk++) {
       wawes[ii][kk] = step * 2;
     }
   }
-  this.checkLimit = function(x, y) {
-    if (x >= 0 && x < step && y >= 0 && y < step)
-      return true;
-    else
-      return false;
-  };
 
   this.checkSafePoint = function(point, step) {
     var safe = 0;
     for (var y = -1; y <= 1; ++y)
       for (var x = -1; x <= 1; ++x)
-        if (!(x == 0 && y == 0) && (x == 0 | y == 0))
+        if (!(x == 0 && y == 0) && (x == 0 || y == 0))
         //проверка на выход за пределы поля
-          if (this.checkLimit(point[1] + x, point[0] + y)) {
+          if (checkLimit(point[1] + x, point[0] + y)) {
             if (this.checkPointObstacle(point[1] + x, point[0] + y))
               if (step < 2)
                 safe++;
@@ -385,6 +498,21 @@ function Lee() {
       return true;
     else
       return false;
+  };
+
+  this.enemiesCheckPoint = function(point, dist) {
+    var ret = true;
+    enemies.forEach(function(enemy) {
+      var dstn = pointDistance(point, enemy[0]);
+      if (dstn < dist) {
+        if (dstn < wawes[point[0]][point[1]] ||
+            (dstn == wawes[point[0]][point[1]] && length < enemy.length)) {
+          ret = false;
+          return false;
+        }
+      }
+    });
+    return ret;
   };
 
   this.checkEndPoint = function(x, y) {
@@ -401,7 +529,10 @@ function Lee() {
       return false;
   };
   this.getCoords = function() {
-    return coords;
+    if (maskTime > 0 && maskCoords)
+      return maskCoords;
+    else
+      return coords;
   };
   this.getCell = function() {
     return this.returnToStart(coords);
@@ -411,17 +542,17 @@ function Lee() {
     var minimal = wawes[point[0]][point[1]];
     for (var y = -1; y <= 1 && minimal != 1; ++y)
       for (var x = -1; x <= 1 && minimal != 1; ++x)
-        if (!(x == 0 && y == 0) && (x == 0 | y == 0))
+        if (!(x == 0 && y == 0) && (x == 0 || y == 0))
         //проверка на выход за пределы поля
-          if (this.checkLimit(point[1] + x, point[0] + y))
+          if (checkLimit(point[1] + x, point[0] + y)) {
             if (wawes[point[0] + y][point[1] + x] < minimal &&
                 wawes[point[0] + y][point[1] + x] >= 1) {
               mcrd = [point[0] + y, point[1] + x];
               minimal = wawes[point[0] + y][point[1] + x];
             }
+          }
 
     if (minimal < 2) {
-      console.log(mcrd);
       return mcrd;
     } else {
       if (mcrd)
@@ -432,6 +563,7 @@ function Lee() {
       }
     }
   };
+
   this.checkPoints = function(p) {
     var count = p.length;
     var points = new Array();
@@ -442,11 +574,19 @@ function Lee() {
       //если достигли конца, то тикаем
       if (this.checkEndPoint(p[i][1], p[i][0])) {
         if (this.checkSafePoint(p[i], 2)) {
-          var itscost = costs[matrix[p[i][0]][p[i][1]].charCodeAt(0)];
-          if (cost > wawes[p[i][0]][p[i][1]] / itscost) {
-            coords[0] = p[i][0];
-            coords[1] = p[i][1];
-            cost = wawes[p[i][0]][p[i][1]] / itscost;
+          if (this.enemiesCheckPoint(p[i], 10)) {
+            var itscost = costs[matrix[p[i][0]][p[i][1]].charCodeAt(0)];
+            if (cost > wawes[p[i][0]][p[i][1]] / itscost) {
+              coords[0] = p[i][0];
+              coords[1] = p[i][1];
+              cost = wawes[p[i][0]][p[i][1]] / itscost;
+              if (maskTime >= wawes[p[i][0]][p[i][1]]) {
+                if (maskCost > cost) {
+                  maskCost = cost;
+                  maskCoords = coords;
+                }
+              }
+            }
           }
         }
       }
@@ -455,7 +595,7 @@ function Lee() {
         for (var x = -1; x <= 1; x++) //++X БЫЛО
           if (!(x == 0 && y == 0) && (x == 0 || y == 0)) {
             //проверка на выход за пределы поля
-            if (this.checkLimit(p[i][1] + x, p[i][0] + y)) {
+            if (checkLimit(p[i][1] + x, p[i][0] + y)) {
               //проверка на препятствия
               if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y) &&
                   this.checkSafePoint([p[i][0] + y, p[i][1] + x], 1)) {
