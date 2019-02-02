@@ -29,9 +29,9 @@ var head = [0, 0]; // y, x
 var step;
 var costs = [];
 
-costs['○'.charCodeAt(0)] = 1;
+costs['○'.charCodeAt(0)] = 2;
 costs['$'.charCodeAt(0)] = 5;
-costs['®'.charCodeAt(0)] = 2;
+costs['®'.charCodeAt(0)] = 20;
 costs['©'.charCodeAt(0)] = 2;
 costs['●'.charCodeAt(0)] = 10;
 
@@ -39,6 +39,9 @@ var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
 var fly = '♠';
 var fury = '♥';
 var status = 'ok';
+var maskTime = 0;
+var maskFury = '®';
+var maskFly = '©';
 var symbols = {
   'ok': [
     ' ',
@@ -240,6 +243,8 @@ function doSend(message) {
 
 function parseData(data) {
   step = Math.sqrt(data.length);
+  if (maskTime > 0)
+    maskTime--;
   matrix = [];
   for (var i = 0, charsLength = data.length; i < charsLength; i += step) {
     matrix.push(data.substring(i, i + step));
@@ -257,6 +262,11 @@ function parseData(data) {
     lee.checkPoints([[head[0], head[1]]]);
     console.log('EAT ON ' + lee.getCoords());
     var cell = lee.getCell();
+    if (matrix[cell[0]][cell[1]] == maskFury) {
+      maskTime = 10;
+    } else if (matrix[cell[0]][cell[1]] == maskFly) {
+      maskTime = 10;
+    }
     console.log('Sending...');
     if (cell) {
       console.log('Command :)');
@@ -287,9 +297,9 @@ function setStatus(data) {
   var minLength = bigLength;
   if (prevObj == stone)
     minLength += bigLength;
-  if (data.indexOf(fury) + 1) {
+  if (data.indexOf(fury) + 1 && maskTime > 0) {
     status = 'fury';
-  } else if (data.indexOf(fly) + 1) {
+  } else if (data.indexOf(fly) + 1 && maskTime > 0) {
     if (length >= minLength)
       status = 'flybig';
     else
@@ -319,7 +329,7 @@ function getCommand(cell) {
   } else {
     com = 'NONE';
   }
-  if (status == 'big' || status == 'fury')
+  if (status == 'fury')
     com += ',' + COMMANDS[4];
   return com;
 }
@@ -446,7 +456,8 @@ function Lee() {
             //проверка на выход за пределы поля
             if (this.checkLimit(p[i][1] + x, p[i][0] + y)) {
               //проверка на препятствия
-              if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y)) {
+              if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y) &&
+                  this.checkSafePoint([p[i][0] + y, p[i][1] + x], 1)) {
                 //проверка на краткость пути
                 if (wawes[p[i][0] + y][p[i][1] + x] > wawes[p[i][0]][p[i][1]] +
                     1) {
