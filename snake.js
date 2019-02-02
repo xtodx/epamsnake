@@ -1,5 +1,6 @@
 $(document).ready(function() {
   snakeWebSocket();
+  setInterval(reloadPage,600000)
 });
 
 function reloadPage() {
@@ -20,7 +21,6 @@ String.prototype.indexOfArray = function(array) {
 };
 
 var socket;
-var URL = 'https://game2.epam-bot-challenge.com.ua/codenjoy-contest/board/player/webmasterbycom@gmail.com?code=16163262031219726121';
 var COMMANDS = ['LEFT', 'RIGHT', 'DOWN', 'UP', 'ACT'];
 var matrix = [];
 var wawes = [];
@@ -28,11 +28,12 @@ var length = 0;
 var head = [0, 0]; // y, x
 var step;
 var costs = [];
+var URL = '';
 
 costs['○'.charCodeAt(0)] = 2;
 costs['$'.charCodeAt(0)] = 5;
 costs['®'.charCodeAt(0)] = 20;
-costs['©'.charCodeAt(0)] = 2;
+costs['©'.charCodeAt(0)] = 5;
 costs['●'.charCodeAt(0)] = 10;
 
 var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
