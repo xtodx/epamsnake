@@ -15,6 +15,11 @@
     </script>
 
     <style>
+        .board{
+            width: 900px;
+            background: url("img/background.png");
+            background-size: contain;
+        }
         .row {
             display: flex;
             width: 100%;
@@ -22,12 +27,11 @@
 
         .cell {
             text-align: center;
-            height: 20px;
+            height: 30px;
             flex: 1;
-        }
-
-        .cell.enemy {
-            background: #ffaaaa;
+            background: url("img/background.png") no-repeat center;
+            background-size: contain;
+            font-size: 0;
         }
 
         .cell:before {
@@ -40,17 +44,19 @@
     </style>
 </head>
 <body>
-<?php
-    for ($i = 0; $i < 30; $i++) {
-        ?>
-        <div class="row">
-            <?php
-                for ($k = 0; $k < 30; $k++) {
-                    ?>
-                    <div class="cell" id="c-<?= $i ?>-<?= $k ?>"></div>
-                <?php } ?>
-        </div>
-    <?php } ?>
+<div class="board">
+    <?php
+        for ($i = 0; $i < 30; $i++) {
+            ?>
+            <div class="row">
+                <?php
+                    for ($k = 0; $k < 30; $k++) {
+                        ?>
+                        <div class="cell" id="c-<?= $i ?>-<?= $k ?>"></div>
+                    <?php } ?>
+            </div>
+        <?php } ?>
+</div>
 <hr>
 <form>
     <textarea name="URL" style="width: 100%;margin-bottom: 15px;"><?= $_GET['URL'] ?></textarea>

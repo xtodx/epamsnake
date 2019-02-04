@@ -4,7 +4,7 @@ $(document).ready(function() {
 });
 
 function reloadPage() {
-  location.reload();
+  window.location.reload(true);
 }
 
 String.prototype.indexOfArray = function(array) {
@@ -53,30 +53,25 @@ var step;
 var costs = [];
 var URL = '';
 
-costs['○'.charCodeAt(0)] = 20;
-costs['$'.charCodeAt(0)] = 50;
-costs['®'.charCodeAt(0)] = 200;
-costs['©'.charCodeAt(0)] = 10;
-costs['●'.charCodeAt(0)] = 100;
-costs['˅'.charCodeAt(0)] = 100;
-costs['<'.charCodeAt(0)] = 100;
-costs['>'.charCodeAt(0)] = 100;
-costs['˄'.charCodeAt(0)] = 100;
-costs['─'.charCodeAt(0)] = 50;
-costs['│'.charCodeAt(0)] = 50;
-costs['┐'.charCodeAt(0)] = 50;
-costs['┘'.charCodeAt(0)] = 50;
-costs['┌'.charCodeAt(0)] = 50;
-costs['└'.charCodeAt(0)] = 50;
-costs[' '.charCodeAt(0)] = 1; //Сделал завышенные коэфициенты, и добавил пробел в символы "еда", чтоб если нет адекватной еды, мы ехали в ближайший пустой блок, но не убивались об стену. Лучше пусть другие умирают.
+costs['○'.charCodeAt(0)] = 200;
+costs['$'.charCodeAt(0)] = 300;
+costs['®'.charCodeAt(0)] = 1000;
+costs['©'.charCodeAt(0)] = 100;
+costs['●'.charCodeAt(0)] = 500;
+costs['˅'.charCodeAt(0)] = 500;
+costs['<'.charCodeAt(0)] = 500;
+costs['>'.charCodeAt(0)] = 500;
+costs['˄'.charCodeAt(0)] = 500;
+costs['─'.charCodeAt(0)] = 300;
+costs['│'.charCodeAt(0)] = 300;
+costs['┐'.charCodeAt(0)] = 300;
+costs['┘'.charCodeAt(0)] = 300;
+costs['┌'.charCodeAt(0)] = 300;
+costs['└'.charCodeAt(0)] = 300;
+costs[' '.charCodeAt(0)] = 1; //Сделал завышенные коэфициенты, и добавил пробел в символы "еда", чтоб если нет подходящей еды, мы ехали в ближайший пустой блок, но не убиваться об стену же. Лучше пусть другие умирают.
 
-var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
-var fly = '♠';
-var fury = '♥';
 var status = 'ok';
 var maskTime = 0;
-var maskFury = '®';
-var maskFly = '©';
 var enemies = [];
 var symbols = {
   'ok': [
@@ -226,12 +221,55 @@ var eatSymbols = {
     '└'],
 };
 var stone = '●';
+var apple = '○';
 var prevObj = '○';
 var bigLength = 5;
 var snakeSymbols = ['╙', '╘', '╓', '╕', '═', '║', '╗', '╝', '╔', '╚'];
 var enemySymbols = ['¤', '×', 'æ', 'ö', '─', '│', '┐', '┘', '┌', '└'];
 var enemyHeads = ['˅', '<', '>', '˄', '♣', '♦'];
-var neck = '#';
+var neck = '╬';
+var danger = '₷';
+var headSymbols = ['◄', '►', '▲', '▼', '♥', '♠'];
+var fly = '♠';
+var fury = '♥';
+var maskFury = '®';
+var maskFly = '©';
+var zagon = '#';
+var wall = '☼';
+var gold = '$';
+
+var printSymbols = [];
+
+//генерация символов для вывода
+printSymbolsGenerator(enemySymbols, 'enemy');
+printSymbolsGenerator(enemyHeads, 'enemyh');
+
+printSymbolsGenerator(snakeSymbols, 'snake');
+printSymbolsGenerator(headSymbols, 'head');
+
+printSymbolsGenerator(stone, 'stone');
+printSymbolsGenerator(apple, 'apple');
+printSymbolsGenerator(gold, 'gold');
+
+printSymbolsGenerator(maskFury, 'maskFury');
+printSymbolsGenerator(maskFly, 'maskFly');
+
+printSymbolsGenerator(neck, 'neck');
+printSymbolsGenerator(danger, 'danger');
+
+printSymbolsGenerator(zagon, 'zagon');
+printSymbolsGenerator(wall, 'wall');
+
+printSymbolsGenerator(' ', 'background');
+
+function printSymbolsGenerator(array, clas) {
+  if (Array.isArray(array))
+    array.forEach(function(obj, i) {
+      printSymbols[obj.charCodeAt(0)] = clas + i;
+    });
+  else
+    printSymbols[array.charCodeAt(0)] = clas;
+}
 
 function snakeWebSocket() {
   var ws = URL.replace('http', 'ws').
@@ -393,14 +431,14 @@ function printData() {
     row = row.split('');
     row.forEach(function(sym, k) {
       $('#c-' + i + '-' + k).html(sym);
+      $('#c-' + i + '-' + k).
+          css({
+            'background-image': 'url(\'img/' + printSymbols[sym.charCodeAt(0)] +
+            '.png\')',
+          });
     });
   });
 
-  enemies.forEach(function(enemy) {
-    enemy.forEach(function(cr) {
-      $('#c-' + cr[0] + '-' + cr[1]).addClass('enemy');
-    });
-  });
 }
 
 function randomInteger(min, max) {
@@ -433,11 +471,27 @@ function EnemiesFinder() {
         var ends = that.findEnemy(enemy[0]);
         enemy = enemy.concat(ends);
         enemies[enemies.length] = enemy;
+        that.blockBigSnakes(enemy);
       });
     });
     return enemies;
   };
-
+  this.blockBigSnakes = function(point) {
+    if ((point.length >= length && (status != 'fury' || status != 'fly')) ||
+        (matrix[point[0][0]][point[0][1]] == '♣' && (status != 'fury' ||
+            (status = 'fury' && point.length >= length)))) {
+      for (var y = -1; y <= 1; ++y)
+        for (var x = -1; x <= 1; ++x)
+          if (!(x == 0 && y == 0) && (x == 0 || y == 0))
+            if (checkLimit(point[0][1] + x, point[0][0] + y) &&
+                !this.checkSymbols(point[0][1] + x, point[0][0] + y) &&
+                matrix[point[0][0] + y][point[0][1] + x] != wall &&
+                matrix[point[0][0] + y][point[0][1] + x] != zagon) {
+              matrix[point[0][0] + y] = matrix[point[0][0] +
+              y].replaceAt(point[0][1] + x, danger);
+            }
+    }
+  };
   this.checkSymbols = function(x, y) {
     if (enemySymbols.indexOf(matrix[y][x]) + 1)
       return true;
@@ -598,7 +652,7 @@ function PathFinder() {
             if (checkLimit(p[i][1] + x, p[i][0] + y)) {
               //проверка на препятствия
               if (this.checkPointObstacle(p[i][1] + x, p[i][0] + y) &&
-                  this.checkSafePoint([p[i][0] + y, p[i][1] + x], 1)) {
+                  this.checkSafePoint([p[i][0] + y, p[i][1] + x], 2)) {
                 //проверка на краткость пути
                 if (wawes[p[i][0] + y][p[i][1] + x] > wawes[p[i][0]][p[i][1]] +
                     1) {
