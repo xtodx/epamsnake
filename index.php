@@ -18,7 +18,20 @@
         .board{
             width: 900px;
             background: url("img/background.png");
-            background-size: contain;
+            float: left;
+        }
+        .board-stat{
+            float: left;
+        }
+        .board-stat img{
+            vertical-align: middle;
+        }
+        .board-stat b{
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .clear{
+            clear: both;
         }
         .row {
             display: flex;
@@ -57,6 +70,10 @@
             </div>
         <?php } ?>
 </div>
+<div class="board-stat">
+    <p><img src="img/stone.png" alt="stone"> <b id="stones"></b></p>
+</div>
+<div class="clear"></div>
 <hr>
 <form>
     <textarea name="URL" style="width: 100%;margin-bottom: 15px;"><?= $_GET['URL'] ?></textarea>

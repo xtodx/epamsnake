@@ -48,14 +48,16 @@ var matrix = [];
 var wawes = [];
 var length = 0;
 var head = [0, 0]; // y, x
+var tail = [30, 30];
+var snake = [];
 var napr = 'RIGHT';
 var step;
 var costs = [];
 var URL = '';
 
-costs['○'.charCodeAt(0)] = 200;
-costs['$'.charCodeAt(0)] = 300;
-costs['®'.charCodeAt(0)] = 1000;
+costs['○'.charCodeAt(0)] = 500;
+costs['$'.charCodeAt(0)] = 700;
+costs['®'.charCodeAt(0)] = 600;
 costs['©'.charCodeAt(0)] = 100;
 costs['●'.charCodeAt(0)] = 500;
 costs['˅'.charCodeAt(0)] = 500;
@@ -72,6 +74,7 @@ costs[' '.charCodeAt(0)] = 1; //Сделал завышенные коэфици
 
 var status = 'ok';
 var maskTime = 0;
+var dopcom = false;
 var enemies = [];
 var symbols = {
   'ok': [
@@ -145,36 +148,7 @@ var symbols = {
     '$',
     '®',
     '©',
-    '◄',
-    '►',
-    '▲',
-    '▼',
-    '♥',
-    '♠',
-    '˅',
-    '<',
-    '>',
-    '˄',
-    '¤',
-    '×',
-    'æ',
-    'ö',
-    '─',
-    '│',
-    '┐',
-    '┘',
-    '┌',
-    '└',
-    '╙',
-    '╘',
-    '╓',
-    '╕'],
-  'flybig': [
-    ' ',
-    '○',
-    '$',
-    '®',
-    '©',
+    '●',
     '◄',
     '►',
     '▲',
@@ -203,7 +177,6 @@ var symbols = {
 var eatSymbols = {
   'ok': [' ', '○', '$', '®', '©'],
   'fly': [' ', '○', '$', '®', '©'],
-  'flybig': [' ', '○', '●', '$', '®', '©'],
   'big': [' ', '○', '●', '$', '®', '©'],
   'fury': [
     ' ',
@@ -223,8 +196,10 @@ var eatSymbols = {
 var stone = '●';
 var apple = '○';
 var prevObj = '○';
+var stones = 0;
 var bigLength = 5;
 var snakeSymbols = ['╙', '╘', '╓', '╕', '═', '║', '╗', '╝', '╔', '╚'];
+var tailSymbols = ['╙', '╘', '╓', '╕'];
 var enemySymbols = ['¤', '×', 'æ', 'ö', '─', '│', '┐', '┘', '┌', '└'];
 var enemyHeads = ['˅', '<', '>', '˄', '♣', '♦'];
 var neck = '╬';
@@ -237,6 +212,7 @@ var maskFly = '©';
 var zagon = '#';
 var wall = '☼';
 var gold = '$';
+var smile = '☺';
 
 var printSymbols = [];
 
@@ -259,8 +235,13 @@ printSymbolsGenerator(danger, 'danger');
 
 printSymbolsGenerator(zagon, 'zagon');
 printSymbolsGenerator(wall, 'wall');
+printSymbolsGenerator(smile, 'smile');
 
 printSymbolsGenerator(' ', 'background');
+printSymbolsGenerator('*', 'wall');
+printSymbolsGenerator('ø', 'wall');
+printSymbolsGenerator('&', 'wall');
+printSymbolsGenerator('~', 'wall');
 
 function printSymbolsGenerator(array, clas) {
   if (Array.isArray(array))
@@ -329,16 +310,25 @@ function parseData(data) {
     matrix[matrix.length] = data.substring(i, i + step);
   }
   var hd = data.indexOfArray(headSymbols);
-  length = findLength(data);
+  findSnake(data);
   console.log('LENGTH = ' + length);
+
+  if (prevObj == stone) {
+    stones++;
+  }
   setStatus(data);
-  var efinder = new EnemiesFinder();
-  efinder.find(data);
-  efinder = null;
   if (hd) {
     head[0] = Math.floor(hd[0] / step);
     head[1] = hd[0] % step;
+    var tl = data.indexOfArray(tailSymbols);
+    tail[0] = Math.floor(tl[0] / step);
+    tail[1] = tl[0] % step;
+
     blockAfterHead(head);
+    setDopTail();
+    var efinder = new EnemiesFinder();
+    efinder.find(data);
+    efinder = null;
     var finder = new PathFinder();
     console.log('Finding...');
     wawes[head[0]][head[1]] = 0;
@@ -353,26 +343,56 @@ function parseData(data) {
     }
     if (cell) {
       console.log('Command :)');
+      setDopCommand(cell);
       doSend(getCommand(cell));
     } else {
       console.log('NO COMMAND :(');
       doSend('NONE');
     }
   } else {
+    stones = 0;
     doSend('NONE');
   }
   setTimeout(printData, 1);
 }
 
-function findLength(data) {
-  var lngth = 1;
+function findSnake(data) {
+  length = 1;
+  snake = [];
   snakeSymbols.forEach(function(sym) {
-    if (data.indexOf(data) + 1)
-      lngth += (data.split(sym).length - 1);
+    var snpos = data.indexOf(sym);
+    if (snpos != -1) {
+      length += (data.split(sym).length - 1);
+      var sn = [];
+      sn[0] = Math.floor(snpos / step);
+      sn[1] = snpos % step;
+      snake[snake.length] = sn;
+    }
   });
+}
 
-  return lngth;
+function setDopTail() {
+  if (status == 'fury' && length > 2 && stones > 0) {
+    matrix[tail[0]] = matrix[tail[0]].replaceAt(tail[1], stone);
+  }
+}
 
+function setDopCommand(cell) {
+  dopcom = false;
+  if (stones > 0 && (status == 'fury' &&
+      (cell.join(',') == tail.join(',') || length < 3))) {
+    dopcom = COMMANDS[4];
+    stones--;
+  } else {
+    if (status == 'fury') {
+      console.log('NO STONE WTF');
+      console.log(stones);
+      console.log(length);
+      console.log(cell.join(','));
+      console.log(tail.join(','));
+      console.log(cell.join(',') == tail.join(','));
+    }
+  }
 }
 
 function blockAfterHead(point) {
@@ -388,21 +408,30 @@ function blockAfterHead(point) {
 }
 
 function setStatus(data) {
-  var minLength = bigLength;
-  if (prevObj == stone)
-    minLength += bigLength;
   if (data.indexOf(fury) + 1 && maskTime > 0) {
     status = 'fury';
   } else if (data.indexOf(fly) + 1 && maskTime > 0) {
-    if (length >= minLength)
-      status = 'flybig';
-    else
-      status = 'fly';
-  } else if (length >= minLength) {
+    status = 'fly';
+  } else if (biggerLength()) {
     status = 'big';
   } else {
     status = 'ok';
   }
+}
+
+function biggerLength() {
+  var max = bigLength;
+  if (prevObj == stone) {
+    max += bigLength;
+  }
+  enemies.forEach(function(e) {
+    if (e.length > max)
+      max = e.length;
+  });
+  if (length > (max + 3))
+    return true;
+  else
+    return false;
 }
 
 function getCommand(cell) {
@@ -419,9 +448,10 @@ function getCommand(cell) {
   } else {
     com = 'NONE';
   }
-  napr = com;
-  if (status == 'fury')
-    com += ',' + COMMANDS[4];
+  if (com != 'NONE')
+    napr = com;
+  if (dopcom)
+    com += ',' + dopcom;
   return com;
 }
 
@@ -431,13 +461,19 @@ function printData() {
     row = row.split('');
     row.forEach(function(sym, k) {
       $('#c-' + i + '-' + k).html(sym);
-      $('#c-' + i + '-' + k).
-          css({
-            'background-image': 'url(\'img/' + printSymbols[sym.charCodeAt(0)] +
-            '.png\')',
-          });
+      if (printSymbols[sym.charCodeAt(0)]) {
+        $('#c-' + i + '-' + k).
+            css({
+              'background-image': 'url(\'img/' +
+              printSymbols[sym.charCodeAt(0)] +
+              '.png\')',
+            });
+      } else {
+        console.log(sym);
+      }
     });
   });
+  $('#stones').html(stones);
 
 }
 
@@ -471,24 +507,22 @@ function EnemiesFinder() {
         var ends = that.findEnemy(enemy[0]);
         enemy = enemy.concat(ends);
         enemies[enemies.length] = enemy;
-        that.blockBigSnakes(enemy);
+        that.blockBigSnakes(enemy[0], enemy.length);
       });
     });
     return enemies;
   };
-  this.blockBigSnakes = function(point) {
-    if ((point.length >= length && (status != 'fury' || status != 'fly')) ||
-        (matrix[point[0][0]][point[0][1]] == '♣' && (status != 'fury' ||
-            (status = 'fury' && point.length >= length)))) {
+  this.blockBigSnakes = function(eHead, eLength) {
+    if ((eLength + 2 >= length && status != 'fury') ||
+        (matrix[eHead[0]][eHead[1]] == '♣' && (status != 'fury' ||
+            (status == 'fury' && eLength + 2 >= length)))) {
       for (var y = -1; y <= 1; ++y)
         for (var x = -1; x <= 1; ++x)
           if (!(x == 0 && y == 0) && (x == 0 || y == 0))
-            if (checkLimit(point[0][1] + x, point[0][0] + y) &&
-                !this.checkSymbols(point[0][1] + x, point[0][0] + y) &&
-                matrix[point[0][0] + y][point[0][1] + x] != wall &&
-                matrix[point[0][0] + y][point[0][1] + x] != zagon) {
-              matrix[point[0][0] + y] = matrix[point[0][0] +
-              y].replaceAt(point[0][1] + x, danger);
+            if (checkLimit(eHead[1] + x, eHead[0] + y) &&
+                matrix[eHead[0] + y][eHead[1] + x] == ' ') {
+              matrix[eHead[0] + y] = matrix[eHead[0] +
+              y].replaceAt(eHead[1] + x, danger);
             }
     }
   };
@@ -560,7 +594,12 @@ function PathFinder() {
       var dstn = pointDistance(point, enemy[0]);
       if (dstn < dist) {
         if (dstn < wawes[point[0]][point[1]] ||
-            (dstn == wawes[point[0]][point[1]] && length < enemy.length)) {
+            (dstn == wawes[point[0]][point[1]] &&
+                ((length < enemy.length + 2 && wawes[point[0]][point[1]] !=
+                    '♣' && status != 'fail') ||
+                    (wawes[point[0]][point[1]] == '♣' && status != 'fail') ||
+                    (length < enemy.length + 2 && wawes[point[0]][point[1]] ==
+                        '♣' && status == 'fail')))) {
           ret = false;
           return false;
         }
@@ -628,7 +667,7 @@ function PathFinder() {
       //если достигли конца, то тикаем
       if (this.checkEndPoint(p[i][1], p[i][0])) {
         if (this.checkSafePoint(p[i], 2)) {
-          if (this.enemiesCheckPoint(p[i], 10)) {
+          if (this.enemiesCheckPoint(p[i], 5)) {
             var itscost = costs[matrix[p[i][0]][p[i][1]].charCodeAt(0)];
             if (cost > wawes[p[i][0]][p[i][1]] / itscost) {
               coords[0] = p[i][0];
